@@ -1,0 +1,48 @@
+name: Repository mit Copier erstellen
+description: Projekt konfigurieren und als Vorschau oder GitHub-Repository erzeugen.
+title: "[repo] Neues Projekt"
+body:
+  - type: dropdown
+    id: action
+    attributes:
+      label: Aktion
+      options:
+        - preview
+        - create
+    validations:
+      required: true
+  - type: input
+    id: repository_name
+    attributes:
+      label: Repository-Name
+      placeholder: demo-service
+    validations:
+      required: true
+  - type: dropdown
+    id: visibility
+    attributes:
+      label: Sichtbarkeit
+      options:
+        - private
+        - public
+    validations:
+      required: true
+  - type: dropdown
+    id: python_version
+    attributes:
+      label: Python-Version
+      options:
+        - "3.13"
+        - "3.12"
+        - "3.11"
+    validations:
+      required: true
+  - type: dropdown
+    id: include_ci
+    attributes:
+      label: CI aktivieren
+      options:
+        - "yes"
+        - "no"
+    validations:
+      required: true

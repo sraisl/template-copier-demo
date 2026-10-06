@@ -1,0 +1,7 @@
+import unittest
+from main import greeting
+
+
+class GreetingTest(unittest.TestCase):
+    def test_greeting(self):
+        self.assertEqual(greeting(), "Hallo von {{ repository_name }}!")

@@ -1,0 +1,33 @@
+name: Issue-Aktionen
+on:
+  issues:
+    types: [opened, reopened]
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: issue-${{ github.event.issue.number }}
+  cancel-in-progress: false
+jobs:
+  execute:
+    if: startsWith(github.event.issue.title, '[repo]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync
+      - name: Issue ausführen
+        run: uv run python scripts/automation.py
+        env:
+          ISSUE_TOKEN: ${{ github.token }}
+          REPO_FACTORY_TOKEN: ${{ secrets.REPO_FACTORY_TOKEN }}
+          TARGET_OWNER: ${{ vars.TARGET_OWNER }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: copier-preview
+          path: output/
+          include-hidden-files: true
+          if-no-files-found: ignore

@@ -1,0 +1,11 @@
+_subdirectory: project
+_answers_file: .copier-answers.yml
+repository_name:
+  type: str
+python_version:
+  type: str
+  default: "3.13"
+  choices: ["3.11", "3.12", "3.13"]
+include_ci:
+  type: bool
+  default: true
