@@ -44,6 +44,6 @@ body:
     attributes:
       label: Reusable Workflow
       description: Externer Workflow im Format OWNER/REPO/.github/workflows/DATEI.yml@REF. Er muss workflow_call mit String-Input types unterstützen und für das neue Repository zugänglich sein.
-      placeholder: sraisl/reusable-workflows/.github/workflows/ci.yml@main
+      value: sraisl/reusable-workflows/.github/workflows/ci.yml@main
     validations:
       required: true
