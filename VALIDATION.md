@@ -1,11 +1,12 @@
-# Validierung der Erweiterung
+# Validierung der Sonar-Erweiterung
 
-- 12 lokale Tests für Formularvalidierung, Dispatcher, Berechtigungen,
-  Variablenkonfiguration, Secret-Erzeugung, bestehende Secrets und vertrauliche
-  Fehlermeldungen erfolgreich. GitHub-Aufrufe sind dabei gemockt.
-- Bestehende Workflows und neuer Konfigurations-Prüfworkflow mit `actionlint` geprüft.
-- Der ursprüngliche Repository-Erstellungsablauf wurde vom Benutzer auf GitHub
-  erfolgreich getestet.
-- Der vollständige Copier-Integrationstest und die neuen GitHub-End-to-End-Aktionen
-  konnten lokal nicht ausgeführt werden: PyPI ist aus der Sandbox nicht erreichbar.
-  Die Tests bleiben im GitHub-Actions-Testworkflow enthalten.
+- Alle 13 lokalen Tests inklusive Copier-Rendering erfolgreich; Workflows mit actionlint geprüft.
+
+- Tests prüfen URL-Validierung, Ablehnung der entfernten Konfigurationsaktionen,
+  fehlende Sonar-Tokens vor der Anlage und unveränderte bestehende Repositories.
+- Sonar-Einstellungen werden ausschließlich nach erfolgreicher Neuanlage und vor
+  dem ersten Push gesetzt. Der Token wird nur über stdin übergeben.
+- Fehlerausgaben enthalten keinen Token; Konfigurationsfehler verhindern den Push.
+- GitHub-Aufrufe in den Tests sind gemockt. Ein echter Sonar-Token wird nicht verwendet.
+- Ein echter End-to-End-Durchlauf benötigt das Factory-Secret SONAR_TOKEN und eine
+  gültige SONAR_HOST_URL. Der Prüfworkflow prüft Vorhandensein, nicht Token-Gültigkeit.

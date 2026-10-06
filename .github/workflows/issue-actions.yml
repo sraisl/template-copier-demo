@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   execute:
-    if: startsWith(github.event.issue.title, '[repo]') || startsWith(github.event.issue.title, '[config]')
+    if: startsWith(github.event.issue.title, '[repo]')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -24,6 +24,7 @@ jobs:
         env:
           ISSUE_TOKEN: ${{ github.token }}
           REPO_FACTORY_TOKEN: ${{ secrets.REPO_FACTORY_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           TARGET_OWNER: ${{ vars.TARGET_OWNER }}
       - uses: actions/upload-artifact@v4
         with:

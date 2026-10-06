@@ -5,18 +5,13 @@ import json
 import os
 from pathlib import Path
 import re
-import secrets
 import subprocess
 import tempfile
+from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-CREATE_FIELDS = {"Aktion", "Repository-Name", "Sichtbarkeit", "Python-Version", "CI aktivieren"}
-CONFIG_FIELDS = {
-    "set-variable": {"Aktion", "Repository-Name", "Variablenname", "Wert"},
-    "generate-secret": {"Aktion", "Repository-Name", "Secret-Name"},
-}
-FIELDS = CREATE_FIELDS | set().union(*CONFIG_FIELDS.values())
-
+BASE_FIELDS = {"Aktion", "Repository-Name", "Sichtbarkeit", "Python-Version", "CI aktivieren"}
+FIELDS = BASE_FIELDS | {"Sonar konfigurieren", "SONAR_HOST_URL"}
 
 def parse_issue(body):
     parts = re.split(r"^### (.+)\s*$", body, flags=re.MULTILINE)
@@ -25,27 +20,34 @@ def parse_issue(body):
         if label in fields or label not in FIELDS:
             raise ValueError("Unbekanntes oder doppeltes Feld: " + label)
         fields[label] = value.strip()
-    expected = CONFIG_FIELDS.get(fields.get("Aktion"), CREATE_FIELDS)
-    if set(fields) != expected:
+    if not BASE_FIELDS <= set(fields):
         raise ValueError("Bitte das Repository-Issue-Formular vollständig ausfüllen.")
     name = fields["Repository-Name"]
     if not re.fullmatch(r"[a-z][a-z0-9-]{0,62}", name):
         raise ValueError("Repository-Name: 1–63 Zeichen, Kleinbuchstaben, Zahlen und Bindestriche.")
-    if fields["Aktion"] in CONFIG_FIELDS:
-        key = "Variablenname" if fields["Aktion"] == "set-variable" else "Secret-Name"
-        if not re.fullmatch(r"[A-Z_][A-Z0-9_]{0,63}", fields[key]) or fields[key].startswith("GITHUB_"):
-            raise ValueError("Name: maximal 64 Zeichen, A–Z, Zahlen, Unterstrich; kein GITHUB_-Präfix.")
-        if key == "Variablenname":
-            value = fields["Wert"]
-            if not value or len(value) > 256 or not value.isprintable() or value == "_No response_":
-                raise ValueError("Variablenwert: 1–256 druckbare Zeichen in einer Zeile.")
-        return fields
+    # Older creation issues remain valid, without Sonar configuration.
+    fields.setdefault("Sonar konfigurieren", "no")
+    fields.setdefault("SONAR_HOST_URL", "")
     for field, choices in {
         "Aktion": {"preview", "create"}, "Sichtbarkeit": {"public", "private"},
         "Python-Version": {"3.11", "3.12", "3.13"}, "CI aktivieren": {"yes", "no"},
+        "Sonar konfigurieren": {"yes", "no"},
     }.items():
         if fields[field] not in choices:
             raise ValueError("Ungültige Auswahl: " + field)
+    if fields["SONAR_HOST_URL"] == "_No response_":
+        fields["SONAR_HOST_URL"] = ""
+    if fields["Sonar konfigurieren"] == "yes":
+        url = fields["SONAR_HOST_URL"]
+        try:
+            parsed = urlsplit(url)
+            valid = (parsed.scheme in {"https", "http"} and parsed.hostname
+                     and parsed.port != 0 and not parsed.username and not parsed.password
+                     and not parsed.query and not parsed.fragment)
+        except ValueError:
+            valid = False
+        if not valid or not url.isprintable() or any(c.isspace() for c in url) or len(url) > 2048:
+            raise ValueError("SONAR_HOST_URL muss eine HTTP(S)-URL ohne Zugangsdaten, Query oder Fragment sein.")
     return fields
 
 
@@ -72,7 +74,9 @@ def api(path, token, method="GET", data=None):
     return json.loads(result.stdout) if result.stdout.strip() else None
 
 
-def publish(fields, destination, owner, token):
+def publish(fields, destination, owner, token, sonar_token=""):
+    if fields.get("Sonar konfigurieren") == "yes" and not sonar_token.strip():
+        raise ValueError("Factory-Secret SONAR_TOKEN fehlt; es wurde kein Repository erstellt.")
     # Never overwrite or adopt an existing repository. GitHub rejects duplicate names.
     account = api("users/" + owner, token)
     endpoint = "orgs/" + owner + "/repos" if account["type"] == "Organization" else "user/repos"
@@ -82,6 +86,13 @@ def publish(fields, destination, owner, token):
         "name": fields["Repository-Name"], "private": fields["Sichtbarkeit"] == "private",
         "description": "Mit GitHub Issues und Copier erstellt", "auto_init": False,
     })
+    if fields.get("Sonar konfigurieren") == "yes":
+        try:
+            initialize_sonar(repo["full_name"], fields["SONAR_HOST_URL"], sonar_token, token)
+        except RuntimeError as exc:
+            raise RuntimeError("Repository erstellt, Sonar-Konfiguration fehlgeschlagen. "
+                               "Token-Berechtigungen prüfen und Repository manuell prüfen: "
+                               + repo["html_url"]) from exc
     basic = base64.b64encode(("x-access-token:" + token).encode()).decode()
     env = {**os.environ, "GIT_CONFIG_COUNT": "1",
            "GIT_CONFIG_KEY_0": "http.https://github.com/.extraheader",
@@ -105,39 +116,17 @@ def publish(fields, destination, owner, token):
 
 
 
-def configure_repository(fields, source, owner, actor, token):
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,38}", owner):
-        raise ValueError("Ungültiger TARGET_OWNER.")
-    target = owner + "/" + fields["Repository-Name"]
-    if target.lower() == source.lower():
-        raise ValueError("Das Factory-Repository darf nicht als Ziel konfiguriert werden.")
-    # Write access to the factory alone must not grant access to unrelated targets.
-    permission = api(f"repos/{target}/collaborators/{actor}/permission", token)
-    if permission["permission"] not in {"admin", "maintain", "write"}:
-        raise ValueError("Für diese Aktion sind Schreibrechte im Ziel-Repository erforderlich.")
+def initialize_sonar(target, host_url, sonar_token, token):
+    """Called only after successful creation, before the first push."""
     env = {**os.environ, "GH_TOKEN": token}
-    if fields["Aktion"] == "set-variable":
-        name = fields["Variablenname"]
-        command = ["gh", "variable", "set", name, "--repo", target, "--body", fields["Wert"]]
-        value = None
-        message = f"Variable `{name}` in `{target}` gesetzt."
-    else:
-        name = fields["Secret-Name"]
-        # Metadata only: secret values cannot be read from GitHub.
-        result = subprocess.run(["gh", "secret", "list", "--repo", target, "--json", "name"],
-                                env=env, text=True, capture_output=True)
+    for command, value in [
+        (["gh", "variable", "set", "SONAR_HOST_URL", "--repo", target, "--body", host_url], None),
+        (["gh", "secret", "set", "SONAR_TOKEN", "--repo", target], sonar_token),
+    ]:
+        result = subprocess.run(command, input=value, env=env, text=True, capture_output=True)
         if result.returncode:
-            raise RuntimeError("Secret-Namen konnten nicht geprüft werden. Token-Berechtigungen prüfen.")
-        if any(item["name"].upper() == name for item in json.loads(result.stdout)):
-            raise ValueError("Secret existiert bereits; es wird nicht automatisch rotiert.")
-        value = secrets.token_urlsafe(32)
-        command = ["gh", "secret", "set", name, "--repo", target]
-        message = f"Zufälliges Demo-Secret `{name}` in `{target}` erstellt. Der Wert wird nicht ausgegeben."
-    result = subprocess.run(command, input=value, env=env, text=True, capture_output=True)
-    if result.returncode:
-        # Never forward CLI output from a secret-writing operation into issues or logs.
-        raise RuntimeError("Konfiguration fehlgeschlagen. Token-Berechtigungen im Ziel-Repository prüfen.")
-    return message + f"\n\n[Repository-Einstellungen](https://github.com/{target}/settings/secrets/actions)"
+            # Do not expose subprocess output from operations handling secrets.
+            raise RuntimeError("Sonar-Konfiguration fehlgeschlagen. Token-Berechtigungen prüfen.")
 
 
 def main():
@@ -147,8 +136,6 @@ def main():
     args = parser.parse_args()
     if args.body:
         fields = parse_issue(args.body.read_text())
-        if fields["Aktion"] in CONFIG_FIELDS:
-            raise ValueError("--body unterstützt nur lokale Projektvorschauen.")
         render(fields, args.output)
         print("Lokale Vorschau: " + str(args.output))
         return
@@ -169,21 +156,20 @@ def main():
         token = os.environ.get("REPO_FACTORY_TOKEN", "")
         if fields["Aktion"] != "preview" and not token:
             raise ValueError("Repository-Secret REPO_FACTORY_TOKEN fehlt.")
-        if fields["Aktion"] in CONFIG_FIELDS:
-            message = configure_repository(fields, source, owner, actor, token)
-        else:
-            with tempfile.TemporaryDirectory() as temp:
-                destination = Path(temp) / "project"
-                render(fields, destination)
-                if fields["Aktion"] == "preview":
-                    import shutil
-                    if args.output.exists():
-                        raise ValueError("Ausgabeverzeichnis existiert bereits.")
-                    shutil.copytree(destination, args.output)
-                    message = f"Vorschau erzeugt. Das Artefakt `copier-preview` findest du im [Workflow]({run_url})."
-                else:
-                    url = publish(fields, destination, owner, token)
-                    message = f"Repository mit Copier erstellt: {url}"
+        with tempfile.TemporaryDirectory() as temp:
+            destination = Path(temp) / "project"
+            render(fields, destination)
+            if fields["Aktion"] == "preview":
+                import shutil
+                if args.output.exists():
+                    raise ValueError("Ausgabeverzeichnis existiert bereits.")
+                shutil.copytree(destination, args.output)
+                message = f"Vorschau erzeugt. Das Artefakt `copier-preview` findest du im [Workflow]({run_url})."
+            else:
+                url = publish(fields, destination, owner, token, os.environ.get("SONAR_TOKEN", ""))
+                message = f"Repository mit Copier erstellt: {url}"
+                if fields["Sonar konfigurieren"] == "yes":
+                    message += "\n\n`SONAR_HOST_URL` und `SONAR_TOKEN` wurden eingerichtet."
         api(issue_path + "/comments", issue_token, "POST", {"body": message})
         api(issue_path, issue_token, "PATCH", {"state": "closed"})
     except Exception as exc:

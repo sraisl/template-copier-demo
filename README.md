@@ -57,7 +57,7 @@ Für `create` unter **Settings → Secrets and variables → Actions** konfiguri
 Für eine einfache Demo im persönlichen Account eignet sich ein **classic PAT**
 mit `repo` und zusätzlich `workflow`, wenn CI generiert wird. Das Token muss zum
 Zielkonto gehören. Für eine Organisation muss das Konto Repositories erstellen
-dürfen; gegebenenfalls ist eine SSO-Autorisierung erforderlich. Das Token wird für Erstellung, Push und die Konfiguration von Ziel-Repositories verwendet. Der normale `GITHUB_TOKEN`
+dürfen; gegebenenfalls ist eine SSO-Autorisierung erforderlich. Das Token wird für Erstellung, Push und die optionale Sonar-Konfiguration neuer Repositories verwendet. Der normale `GITHUB_TOKEN`
 verarbeitet Issue-Kommentare und kann keine neuen Repositories außerhalb des
 Workflow-Repositories verwalten.
 
@@ -85,7 +85,7 @@ rendern. Für die Demo ist daher kein zweites Template-Repository nötig.
 
 Fehler werden als Kommentar gemeldet; das Issue bleibt offen. Nach einer
 Korrektur das Issue schließen und erneut öffnen. Änderungen am Issue allein
-lösen keine Aktion aus. Titel mit `[repo]` oder `[config]` starten den Workflow.
+lösen keine Aktion aus. Nur Titel mit `[repo]` starten den Workflow.
 
 Ein vorhandenes Ziel-Repository wird niemals überschrieben. Eine erneute
 `create`-Anfrage mit demselben Namen schlägt fehl. Falls die GitHub-Erstellung
@@ -94,58 +94,52 @@ der Fehler nennt dessen URL. Es wird nicht automatisch gelöscht. Für den
 nächsten Versuch einen anderen Namen wählen oder das leere Repository manuell
 bereinigen. Eine neue Vorschau ist jederzeit über ein neues Issue möglich.
 
-## Zusätzliche Demo: Variablen und Secrets
+## Sonar-Konfiguration bei der Repository-Erstellung
 
-Unter **Issues → New issue** stehen zwei weitere Formulare zur Verfügung:
+Im Formular **Repository mit Copier erstellen** gibt es zusätzlich:
 
-| Formular | Aktion | Verhalten |
-| --- | --- | --- |
-| Repository-Variable setzen | `set-variable` | Erstellt oder aktualisiert beispielsweise `APP_ENV=demo` |
-| Repository-Secret generieren | `generate-secret` | Erzeugt beispielsweise `DEMO_TOKEN` aus 32 kryptografisch zufälligen Bytes |
+| Feld | Wirkung |
+| --- | --- |
+| Sonar konfigurieren: `yes` / `no` | Bei `create` die Sonar-Einstellungen im neu erstellten Repository setzen |
+| `SONAR_HOST_URL` | URL des SonarQube-Servers, beispielsweise `https://sonarqube.example.com` |
 
-Der Repository-Name bezieht sich immer auf `TARGET_OWNER` (standardmäßig den
-Besitzer der Factory). Die auslösende Person benötigt aktuelle Schreibrechte
-sowohl in der Factory als auch im Ziel. Die Factory selbst ist als Ziel gesperrt.
-Das Ziel kann auch ein bereits bestehendes Repository sein.
+Im Factory-Repository einmalig unter **Settings → Secrets and variables → Actions**
+das Secret **SONAR_TOKEN** mit einem echten Sonar-Token hinterlegen. Der Workflow
+übernimmt diesen Wert als Secret `SONAR_TOKEN` in das neue Repository. Er wird
+nicht generiert, im Issue abgefragt, in Template-Dateien geschrieben oder ausgegeben.
+Die URL wird als Actions-Variable `SONAR_HOST_URL` gesetzt.
 
-`REPO_FACTORY_TOKEN` muss im Ziel die Konfiguration verwalten dürfen. Bei einem
-Fine-grained PAT oder einer GitHub App sind dafür **Variables: write** und
-**Secrets: write** erforderlich; der Token muss auf das Ziel zugreifen können.
-Die bestehende Classic-PAT-Demo benötigt für diese Repository-Aktionen `repo`.
+`REPO_FACTORY_TOKEN` benötigt im neuen Repository Berechtigungen für Variablen und
+Secrets. Bei Fine-grained Tokens/GitHub Apps sind das **Variables: write** und
+**Secrets: write**. Ein Classic PAT mit `repo` unterstützt diese Repository-Aktionen.
+Bei Fine-grained Tokens darauf achten, dass auch das neue Repository zugänglich ist.
 
-Variablen sind öffentlich innerhalb des Issue-Inhalts: hier nur nicht vertrauliche
-Werte eintragen. Namen müssen aus Großbuchstaben, Zahlen und Unterstrichen bestehen,
-dürfen nicht mit einer Zahl oder `GITHUB_` beginnen und maximal 64 Zeichen lang
-sein. Variablenwerte sind auf eine Zeile mit maximal 256 Zeichen beschränkt.
+### Präsentationsablauf
 
-Secret-Werte werden im Workflow generiert und über stdin an `gh secret set`
-übergeben. Sie erscheinen weder im Issue, in CLI-Argumenten noch in Erfolgsmeldungen.
-Ein vorhandenes Secret wird vor dem Schreiben erkannt und die Anfrage abgelehnt;
-eine absichtliche Rotation ist nicht Bestandteil dieser Demo. Ein zufälliges
-Demo-Secret ist kein von einem externen Dienst ausgestelltes API-Token.
+1. Factory-Secret `SONAR_TOKEN` hinterlegen.
+2. Neues Issue mit Aktion `create`, CI `yes`, Sonar konfigurieren `yes` und der
+   tatsächlichen SonarQube-URL öffnen.
+3. Im neuen Repository unter **Settings → Secrets and variables → Actions**
+   `SONAR_HOST_URL` und `SONAR_TOKEN` zeigen.
+4. Unter **Actions → Sonar-Konfiguration prüfen → Run workflow** die Prüfung starten.
+   Sie zeigt die URL und bestätigt, ob der Token vorhanden ist. Die Gültigkeit
+   des Tokens und die Erreichbarkeit des Sonar-Servers werden damit nicht geprüft.
 
-### Ablauf für eine Präsentation
+Der Prüfworkflow wird bei aktivierter CI erzeugt. Eine Sonar-Analyse oder
+Projektanlage in SonarQube ist nicht Teil dieser Demo. Beispiel-Issue:
+`examples/create-with-sonar.md` (Beispiel-URL durch die echte URL ersetzen).
 
-1. Projekt mit `create` und aktivierter CI erstellen.
-2. Issue **Repository-Variable setzen** öffnen: Repository auswählen,
-   `APP_ENV` als Name und `demo` als Wert eintragen.
-3. Issue **Repository-Secret generieren** öffnen: dasselbe Repository und
-   `DEMO_TOKEN` auswählen.
-4. Im Ziel unter **Settings → Secrets and variables → Actions** die Einträge zeigen.
-5. Unter **Actions → Demo-Konfiguration prüfen → Run workflow** die Prüfung starten.
-   Sie zeigt die Variable und bestätigt lediglich, ob das Secret vorhanden ist.
-6. Ein weiteres Variablen-Issue mit `APP_ENV=staging` demonstriert eine Aktualisierung.
+Die Konfiguration ist ausschließlich Teil einer **Neuanlage**. Separate Aktionen
+für bestehende Repositories gibt es nicht mehr. Vorhandene Ziel-Repositories
+werden abgelehnt, bevor ihre Variablen oder Secrets verändert werden.
+Ein fehlendes Factory-Secret verhindert die Neuanlage bei aktivierter Sonar-Option.
+Die Konfiguration erfolgt nach der GitHub-Anlage und vor dem ersten Push.
+Bei einem Konfigurationsfehler bleibt das neu angelegte Repository bestehen und
+wird im Fehler verlinkt; der Workflow pusht dann keine Dateien.
 
-Neue Projekte mit aktivierter CI enthalten `.github/workflows/check-config.yml`.
-Bei bereits erzeugten Projekten die Datei aus
-`templates/python/project/{% if include_ci %}.github{% endif %}/workflows/check-config.yml`
-ins Ziel-Repository nach `.github/workflows/check-config.yml` kopieren und committen.
-Die Prüfnamen sind im manuellen Workflow anpassbar. Fehlende Variable oder fehlendes
-Secret führt zu einer fehlgeschlagenen Prüfung.
-
-Beispiel-Issue-Inhalte: `examples/set-variable.md` und `examples/generate-secret.md`.
-`--body` dient ausschließlich der lokalen Projektvorschau und lehnt diese
-Konfigurationsaktionen ab.
+`preview` und die lokale Ausführung verändern keine GitHub-Einstellungen und
+benötigen keinen Sonar-Token. Alte Erstellungs-Issues ohne Sonar-Felder bleiben
+nutzbar und erstellen Projekte ohne Sonar-Konfiguration.
 
 ## Weitere Aktionen ergänzen
 
