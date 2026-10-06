@@ -47,3 +47,18 @@ body:
       value: sraisl/reusable-workflows/.github/workflows/ci.yml@main
     validations:
       required: true
+  - type: dropdown
+    id: sonar
+    attributes:
+      label: Sonar konfigurieren
+      description: Bei create SONAR_HOST_URL und das Factory-Secret SONAR_TOKEN im neuen Repository einrichten.
+      options: ["yes", "no"]
+      default: 0
+    validations:
+      required: true
+  - type: input
+    id: sonar_host_url
+    attributes:
+      label: SONAR_HOST_URL
+      description: Bei aktivierter Sonar-Konfiguration erforderlich. Den Token niemals hier eintragen.
+      placeholder: https://sonarqube.example.com

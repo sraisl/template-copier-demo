@@ -103,7 +103,8 @@ def render(fields, destination):
         data.update(java_version=fields["Java-Version"], include_sast=fields.get("SAST aktivieren") == "yes")
     elif template == "universal":
         data.update(types_json=json.dumps(parse_types(fields["Typen"]), separators=(",", ":")),
-                    reusable_workflow=fields["Reusable Workflow"])
+                    reusable_workflow=fields["Reusable Workflow"],
+                    include_sonar=fields.get("Sonar konfigurieren") == "yes")
     else:
         data["python_version"] = fields["Python-Version"]
     run_copy(str(ROOT / "templates" / template), destination, defaults=True, data=data)

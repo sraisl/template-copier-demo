@@ -186,9 +186,25 @@ uv run python scripts/automation.py --body examples/preview-universal.md --outpu
 
 Es werden keine Anwendung, Dockerfiles, Builddateien, zusätzlichen Workflows oder
 Copier-Antwortdateien in das universelle Ziel-Repository geschrieben. Checkout,
-Build und weitere Jobs übernimmt der externe Workflow. Secrets werden nicht
-automatisch weitergegeben; zusätzliche Berechtigungen oder Inputs können später
-an dessen tatsächliche Schnittstelle angepasst werden.
+Build und weitere Jobs übernimmt der externe Workflow. Bei aktivierter
+Sonar-Konfiguration werden `SONAR_HOST_URL` als Repository-Variable und
+`SONAR_TOKEN` als Repository-Secret vor dem ersten Push eingerichtet. Das
+universelle Formular wählt diese Option standardmäßig vor; bei Bedarf `no` wählen.
+Den Token einmalig als Factory-Secret hinterlegen und die URL im Issue angeben.
+
+Der aufrufende Workflow übergibt dann ausschließlich `SONAR_TOKEN` explizit:
+
+```yaml
+    secrets:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+```
+
+Der externe Reusable Workflow muss dieses Secret unter
+`on.workflow_call.secrets.SONAR_TOKEN` deklarieren und kann die Repository-Variable
+über `vars.SONAR_HOST_URL` verwenden. Der einzige reguläre Input bleibt `types`.
+Es entsteht kein zusätzlicher Sonar-Prüfworkflow. Beispiel für eine Neuanlage:
+`examples/create-universal-with-sonar.md`. Bei `preview` werden keine
+Repository-Einstellungen oder Secrets angelegt.
 
 Template-Dateien:
 
@@ -198,7 +214,7 @@ Template-Dateien:
 
 ## Sonar-Konfiguration bei der Repository-Erstellung
 
-In den Python- und JDK-Formularen gibt es zusätzlich:
+In allen drei Repository-Formularen gibt es zusätzlich:
 
 | Feld | Wirkung |
 | --- | --- |
@@ -227,7 +243,7 @@ Bei Fine-grained Tokens darauf achten, dass auch das neue Repository zugänglich
    Sie zeigt die URL und bestätigt, ob der Token vorhanden ist. Die Gültigkeit
    des Tokens und die Erreichbarkeit des Sonar-Servers werden damit nicht geprüft.
 
-Der Prüfworkflow wird bei aktivierter CI erzeugt. Eine Sonar-Analyse oder
+Der Prüfworkflow wird bei Python/JDK und aktivierter CI erzeugt; das universelle Template enthält ausschließlich den aufrufenden Workflow. Eine Sonar-Analyse oder
 Projektanlage in SonarQube ist nicht Teil dieser Demo. Beispiel-Issue:
 `examples/create-with-sonar.md` (Beispiel-URL durch die echte URL ersetzen).
 

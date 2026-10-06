@@ -3,3 +3,6 @@ types_json:
   type: str
 reusable_workflow:
   type: str
+include_sonar:
+  type: bool
+  default: false

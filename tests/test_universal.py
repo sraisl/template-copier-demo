@@ -2,6 +2,8 @@ import itertools
 import json
 from pathlib import Path
 import tempfile
+import subprocess
+from unittest.mock import patch
 import unittest
 import yaml
 
@@ -29,6 +31,32 @@ class UniversalTemplateTests(unittest.TestCase):
                     self.assertEqual(caller['uses'], REFERENCE)
                     self.assertIsInstance(caller['with']['types'], str)
                     self.assertEqual(json.loads(caller['with']['types']), list(selection))
+
+    def test_sonar_is_configured_on_creation_and_token_is_forwarded(self):
+        fields = automation.parse_issue((ROOT / 'examples/create-universal-with-sonar.md').read_text())
+        with tempfile.TemporaryDirectory() as temp:
+            destination = Path(temp) / 'project'
+            automation.render(fields, destination)
+            files = [p.relative_to(destination).as_posix() for p in destination.rglob('*') if p.is_file()]
+            self.assertEqual(files, ['.github/workflows/ci.yml'])
+            workflow = yaml.safe_load((destination / files[0]).read_text())
+            self.assertEqual(workflow['jobs']['ci']['secrets'], {'SONAR_TOKEN': '${{ secrets.SONAR_TOKEN }}'})
+            self.assertEqual(set(workflow['jobs']['ci']['with']), {'types'})
+            repo = {'full_name': 'owner/demo-universal-service',
+                    'html_url': 'https://github.com/owner/demo-universal-service',
+                    'clone_url': 'https://github.com/owner/demo-universal-service.git'}
+            with patch.object(automation, 'api', side_effect=[{'type': 'Organization'}, repo]), patch.object(
+                automation, 'initialize_sonar'
+            ) as initialize, patch.object(automation.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)):
+                automation.publish(fields, destination, 'owner', 'fake', 'private-sonar-token')
+                initialize.assert_called_once_with(repo['full_name'], 'https://sonarqube.example.com', 'private-sonar-token', 'fake')
+            self.assertNotIn('private-sonar-token', (destination / files[0]).read_text())
+
+    def test_universal_missing_sonar_token_prevents_creation(self):
+        fields = automation.parse_issue((ROOT / 'examples/create-universal-with-sonar.md').read_text())
+        with patch.object(automation, 'api') as api, self.assertRaises(ValueError):
+            automation.publish(fields, Path('unused'), 'owner', 'fake')
+        api.assert_not_called()
 
     def test_json_input_is_supported(self):
         fields = automation.parse_issue(BODY.replace(', '.join(TYPES), '["node", "docker"]'))

@@ -7,3 +7,7 @@ jobs:
     uses: {{ reusable_workflow }}
     with:
       types: '{{ types_json }}'
+{% if include_sonar %}
+    secrets:
+{% raw %}      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}{% endraw %}
+{% endif %}

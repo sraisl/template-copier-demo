@@ -25,3 +25,10 @@
 - Im Ziel entsteht ausschließlich der Caller-Workflow; types ist ein JSON-String.
 - Leere, doppelte und unbekannte Typen sowie ungültige Workflow-Verweise werden abgelehnt.
 - Der externe Reusable Workflow wird nicht erstellt oder ausgeführt.
+
+## Sonar im universellen Template
+
+- Der Neuanlage-Pfad richtet SONAR_HOST_URL und SONAR_TOKEN auch für universal ein.
+- Ein fehlender Factory-Token verhindert die Anlage; Token-Werte landen nicht in Dateien.
+- Nur der Caller wird gerendert; bei aktivierter Sonar-Option übergibt er SONAR_TOKEN explizit.
+- Der externe Workflow muss dieses Secret deklarieren; seine Ausführung bleibt außerhalb der Demo-Tests.
