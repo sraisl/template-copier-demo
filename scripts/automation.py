@@ -10,8 +10,8 @@ import tempfile
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-BASE_FIELDS = {"Aktion", "Repository-Name", "Sichtbarkeit", "Python-Version", "CI aktivieren"}
-FIELDS = BASE_FIELDS | {"Sonar konfigurieren", "SONAR_HOST_URL"}
+BASE_FIELDS = {"Aktion", "Repository-Name", "Sichtbarkeit", "CI aktivieren"}
+FIELDS = BASE_FIELDS | {"Python-Version", "Vorlage", "Java-Version", "SAST aktivieren", "Sonar konfigurieren", "SONAR_HOST_URL"}
 
 def parse_issue(body):
     parts = re.split(r"^### (.+)\s*$", body, flags=re.MULTILINE)
@@ -25,16 +25,27 @@ def parse_issue(body):
     name = fields["Repository-Name"]
     if not re.fullmatch(r"[a-z][a-z0-9-]{0,62}", name):
         raise ValueError("Repository-Name: 1–63 Zeichen, Kleinbuchstaben, Zahlen und Bindestriche.")
+    fields.setdefault("Vorlage", "python")
+    fields.setdefault("SAST aktivieren", "no")
+    required_version = "Java-Version" if fields["Vorlage"] == "jdk" else "Python-Version"
+    if required_version not in fields:
+        raise ValueError("Versionsauswahl fehlt: " + required_version)
     # Older creation issues remain valid, without Sonar configuration.
     fields.setdefault("Sonar konfigurieren", "no")
     fields.setdefault("SONAR_HOST_URL", "")
     for field, choices in {
         "Aktion": {"preview", "create"}, "Sichtbarkeit": {"public", "private"},
-        "Python-Version": {"3.11", "3.12", "3.13"}, "CI aktivieren": {"yes", "no"},
+        "Vorlage": {"python", "jdk"}, "CI aktivieren": {"yes", "no"},
+        "SAST aktivieren": {"yes", "no"},
         "Sonar konfigurieren": {"yes", "no"},
     }.items():
         if fields[field] not in choices:
             raise ValueError("Ungültige Auswahl: " + field)
+    versions = {"Java-Version": {"17", "21", "25"}, "Python-Version": {"3.11", "3.12", "3.13"}}
+    if fields[required_version] not in versions[required_version]:
+        raise ValueError("Ungültige Auswahl: " + required_version)
+    if fields["SAST aktivieren"] == "yes" and (fields["Vorlage"] != "jdk" or fields["CI aktivieren"] != "yes"):
+        raise ValueError("SAST erfordert das JDK-Template und aktivierte CI.")
     if fields["SONAR_HOST_URL"] == "_No response_":
         fields["SONAR_HOST_URL"] = ""
     if fields["Sonar konfigurieren"] == "yes":
@@ -55,11 +66,19 @@ def render(fields, destination):
     if Path(destination).exists():
         raise ValueError("Ausgabeverzeichnis existiert bereits.")
     from copier import run_copy
-    run_copy(str(ROOT / "templates/python"), destination, defaults=True, data={
+    template = fields.get("Vorlage", "python")
+    if template not in {"python", "jdk"}:
+        raise ValueError("Unbekannte Vorlage.")
+    data = {
         "repository_name": fields["Repository-Name"],
-        "python_version": fields["Python-Version"],
         "include_ci": fields["CI aktivieren"] == "yes",
-    })
+    }
+    if template == "jdk":
+        data.update(java_version=fields["Java-Version"], include_sast=fields.get("SAST aktivieren") == "yes")
+    else:
+        data["python_version"] = fields["Python-Version"]
+    run_copy(str(ROOT / "templates" / template), destination, defaults=True, data=data)
+
 
 
 def api(path, token, method="GET", data=None):

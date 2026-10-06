@@ -1,0 +1,76 @@
+name: JDK-Repository mit Copier erstellen
+description: Java/Maven-Projekt mit wählbarer JDK-Version und optionalem PolyScan-SAST erzeugen.
+title: "[repo] Neues Projekt"
+body:
+  - type: dropdown
+    id: action
+    attributes:
+      label: Aktion
+      options:
+        - preview
+        - create
+    validations:
+      required: true
+  - type: input
+    id: repository_name
+    attributes:
+      label: Repository-Name
+      placeholder: demo-service
+    validations:
+      required: true
+  - type: dropdown
+    id: visibility
+    attributes:
+      label: Sichtbarkeit
+      options:
+        - private
+        - public
+    validations:
+      required: true
+  - type: dropdown
+    id: template
+    attributes:
+      label: Vorlage
+      options: [jdk]
+    validations:
+      required: true
+  - type: dropdown
+    id: java_version
+    attributes:
+      label: Java-Version
+      options: ["21", "25", "17"]
+    validations:
+      required: true
+  - type: dropdown
+    id: include_ci
+    attributes:
+      label: CI aktivieren
+      options:
+        - "yes"
+        - "no"
+    validations:
+      required: true
+  - type: dropdown
+    id: sast
+    attributes:
+      label: SAST aktivieren
+      description: Separaten SAST-Job mit sraisl/polyscan-action erzeugen. Erfordert CI aktivieren = yes.
+      options: ["no", "yes"]
+    validations:
+      required: true
+  - type: dropdown
+    id: sonar
+    attributes:
+      label: Sonar konfigurieren
+      description: Bei create SONAR_HOST_URL und das Factory-Secret SONAR_TOKEN im neuen Repository einrichten. Preview verändert keine GitHub-Einstellungen.
+      options:
+        - "no"
+        - "yes"
+    validations:
+      required: true
+  - type: input
+    id: sonar_host_url
+    attributes:
+      label: SONAR_HOST_URL
+      description: Bei aktivierter Sonar-Konfiguration erforderlich. Den Token niemals hier eintragen.
+      placeholder: https://sonarqube.example.com

@@ -1,0 +1,24 @@
+name: Sonar-Konfiguration prüfen
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sonar-URL anzeigen und Token prüfen
+        env:
+          SONAR_HOST_URL: ${{ vars.SONAR_HOST_URL }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import sys
+          url = os.environ['SONAR_HOST_URL']
+          present = bool(os.environ['SONAR_TOKEN'])
+          print(f"SONAR_HOST_URL: {url!r}")
+          print(f"SONAR_TOKEN vorhanden: {'ja' if present else 'nein'}")
+          if not url or not present:
+              sys.exit('Sonar-Konfiguration unvollständig.')
+          PY

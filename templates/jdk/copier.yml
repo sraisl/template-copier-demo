@@ -1,0 +1,14 @@
+_subdirectory: project
+_answers_file: .copier-answers.yml
+repository_name:
+  type: str
+java_version:
+  type: str
+  default: "21"
+  choices: ["17", "21", "25"]
+include_ci:
+  type: bool
+  default: true
+include_sast:
+  type: bool
+  default: false

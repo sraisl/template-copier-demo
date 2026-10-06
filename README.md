@@ -1,7 +1,7 @@
 # GitHub Issues × Copier – Repository Factory
 
 Ein Demo-Repository als Self-Service-Einstieg: Issue öffnen, Optionen auswählen,
-Workflow erzeugt ein passendes Python-Projekt und legt auf Wunsch ein neues
+Workflow erzeugt ein passendes Python- oder Java/Maven-Projekt und legt auf Wunsch ein neues
 GitHub-Repository an. Das Copier-Template liegt direkt in diesem Repository.
 
 ```mermaid
@@ -41,8 +41,7 @@ git commit -m "Add issue-driven Copier demo"
 gh repo create template-copier-demo --private --source=. --remote=origin --push
 ```
 
-Actions müssen aktiviert sein. Unter **Issues → New issue → Repository mit Copier
- erstellen** eine Anfrage erstellen. Für den ersten Durchlauf `preview` wählen.
+Actions müssen aktiviert sein. Unter **Issues → New issue → Python-Repository mit Copier erstellen** eine Anfrage erstellen. Für den ersten Durchlauf `preview` wählen.
 Nach erfolgreicher Verarbeitung enthält der Kommentar einen Link zum Workflow;
 dort steht das Artefakt `copier-preview` zum Download bereit. Vorschauen benötigen
 kein zusätzliches Secret.
@@ -94,9 +93,54 @@ der Fehler nennt dessen URL. Es wird nicht automatisch gelöscht. Für den
 nächsten Versuch einen anderen Namen wählen oder das leere Repository manuell
 bereinigen. Eine neue Vorschau ist jederzeit über ein neues Issue möglich.
 
+## JDK-Entwicklung mit optionalem SAST
+
+Unter **Issues → New issue → JDK-Repository mit Copier erstellen** steht ein
+zweites Template zur Auswahl. Das bestehende Python-Formular bleibt verfügbar.
+
+| JDK-Option | Wirkung |
+| --- | --- |
+| Java-Version: 17 / 21 / 25 | JDK in `actions/setup-java` und Compiler-Release in `pom.xml` |
+| CI aktivieren: `yes` / `no` | Java-CI und manuellen Sonar-Konfigurationscheck erzeugen |
+| SAST aktivieren: `yes` / `no` | Separaten PolyScan-SAST-Job in der Java-CI erzeugen |
+
+SAST setzt aktivierte CI voraus; widersprüchliche Auswahlen werden abgelehnt.
+Die GitHub-Issue-Formulare zeigen Optionen nicht dynamisch an, deshalb hat JDK
+ein eigenes Formular mit Java-Version anstelle der Python-Version.
+
+Das Projekt enthält eine Java-Beispielanwendung, Maven-Konfiguration und einen
+JUnit-Test. Beide CI-Jobs checken den Code aus und installieren die ausgewählte
+Temurin-JDK-Version. Der Build-Job führt `mvn verify` aus. Der optionale SAST-Job
+verwendet [sraisl/polyscan-action](https://github.com/sraisl/polyscan-action)
+mit dem Java-Scanner SpotBugs/FindSecBugs; Berichte stehen als SARIF-Artefakte
+zur Verfügung. Dafür wird kein Sonar-Token benötigt. Sonar-Konfiguration bleibt
+eine separate optionale Einstellung bei der Neuanlage.
+
+Die Action ist auf den Commit von `v16.1.1` festgelegt. Ein fehlgeschlagenes
+Quality Gate oder ein Scanner-Fehler lässt den SAST-Job fehlschlagen. Es wird
+kein SARIF-Upload in GitHub Code Scanning ausgeführt.
+
+```sh
+uv run python scripts/automation.py --body examples/preview-jdk.md --output output/demo-java-service
+cd output/demo-java-service
+mvn --batch-mode verify
+java -cp target/classes demo.App
+```
+
+Template-Dateien zum Bearbeiten:
+
+- `templates/jdk/copier.yml`: Copier-Optionen.
+- `templates/jdk/project/pom.xml.jinja`: Maven und Compiler-Release.
+- `templates/jdk/project/{% if include_ci %}.github{% endif %}/workflows/ci.yml.jinja`:
+  Checkout, Setup-Java, Build und optionaler SAST-Job.
+- `.github/ISSUE_TEMPLATE/create-jdk-repository.yml`: Formular und Java-Versionen.
+
+Die Factory-CI baut das gerenderte Projekt mit Java 17, 21 und 25 und führt
+für Java 21 zusätzlich PolyScan auf dem generierten Projekt aus.
+
 ## Sonar-Konfiguration bei der Repository-Erstellung
 
-Im Formular **Repository mit Copier erstellen** gibt es zusätzlich:
+In beiden Repository-Formularen gibt es zusätzlich:
 
 | Feld | Wirkung |
 | --- | --- |

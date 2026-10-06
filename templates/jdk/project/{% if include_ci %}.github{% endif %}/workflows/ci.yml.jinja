@@ -1,0 +1,48 @@
+name: Java CI
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  build:
+    name: Build und Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '{{ java_version }}'
+          cache: maven
+      - name: Build und Tests mit Maven
+        run: mvn --batch-mode --no-transfer-progress verify
+{% if include_sast %}
+  sast:
+    name: SAST mit PolyScan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '{{ java_version }}'
+          cache: maven
+      - name: PolyScan
+        uses: sraisl/polyscan-action@c801894f046bf0a567e64cac309d95656713ad8f # v16.1.1
+        with:
+          target: '.'
+          engines: 'spotbugs'
+          gate: 'true'
+          fail-on-engine-error: 'true'
+          sarif: 'true'
+          upload-artifacts: 'true'
+{% endif %}
