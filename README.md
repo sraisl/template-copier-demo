@@ -1,13 +1,13 @@
 # GitHub Issues × Copier – Repository Factory
 
 Ein Demo-Repository als Self-Service-Einstieg: Issue öffnen, Optionen auswählen,
-Workflow erzeugt ein passendes Python- oder Java/Maven-Projekt und legt auf Wunsch ein neues
+Workflow erzeugt ein Python-/Java-Projekt oder einen universellen Workflow-Aufruf und legt auf Wunsch ein neues
 GitHub-Repository an. Das Copier-Template liegt direkt in diesem Repository.
 
 ```mermaid
 flowchart LR
     A[Issue-Formular] --> B[Berechtigung und Eingaben prüfen]
-    B --> C[Copier rendert Python-Template]
+    B --> C[Copier rendert gewähltes Template]
     C --> D{Aktion}
     D -->|preview| E[ZIP-Artefakt im Workflow]
     D -->|create| F[GitHub-Repository erstellen und pushen]
@@ -138,9 +138,67 @@ Template-Dateien zum Bearbeiten:
 Die Factory-CI baut das gerenderte Projekt mit Java 17, 21 und 25 und führt
 für Java 21 zusätzlich PolyScan auf dem generierten Projekt aus.
 
+## Universelles Template mit externem Reusable Workflow
+
+Unter **Issues → New issue → Universelles Repository mit Reusable Workflow erstellen**
+kannst du einen oder mehrere Typen auswählen:
+
+- `node`
+- `docker`
+- `spring-boot`
+- `spring-boot-buildpack`
+
+Zusätzlich den externen Workflow-Verweis angeben:
+`OWNER/REPO/.github/workflows/DATEI.yml@REF`. Branch, Tag oder Commit sind möglich.
+Der Beispielverweis `sraisl/reusable-workflows/.github/workflows/ci.yml@main`
+ist ein angenommener Platzhalter, kein von dieser Demo bereitgestellter Workflow.
+
+Im neuen Repository entsteht **ausschließlich `.github/workflows/ci.yml`**:
+
+```yaml
+name: Universal CI
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  ci:
+    uses: sraisl/reusable-workflows/.github/workflows/ci.yml@main
+    with:
+      types: '["node","docker","spring-boot","spring-boot-buildpack"]'
+```
+
+Bei einer einzelnen Auswahl beispielsweise `types: '["node"]'`. Der Input ist
+immer ein **String mit einem JSON-Array**, keine YAML-Liste. Mehrfachauswahl wird
+vom Issue-Formular als kommagetrennte Auswahl geliefert und von der Automation
+validiert und in JSON umgewandelt. JSON-Arrays in manuell bearbeiteten Issues
+werden ebenfalls akzeptiert. Leere, unbekannte oder doppelte Typen werden abgelehnt.
+
+Der Reusable Workflow wird im anderen Repository angenommen und nicht erzeugt.
+Er muss für das neue Repository zugänglich sein und `workflow_call` mit einem
+String-Input `types` unterstützen. Diese Demo prüft Syntax und Rendering des
+Aufrufs, nicht die Existenz oder das Verhalten des externen Workflows. Solange
+der angegebene Workflow nicht existiert, kann GitHub den Aufruf nicht ausführen.
+Die Beispielvorschau lässt sich trotzdem lokal erzeugen:
+
+```sh
+uv run python scripts/automation.py --body examples/preview-universal.md --output output/demo-universal-service
+```
+
+Es werden keine Anwendung, Dockerfiles, Builddateien, zusätzlichen Workflows oder
+Copier-Antwortdateien in das universelle Ziel-Repository geschrieben. Checkout,
+Build und weitere Jobs übernimmt der externe Workflow. Secrets werden nicht
+automatisch weitergegeben; zusätzliche Berechtigungen oder Inputs können später
+an dessen tatsächliche Schnittstelle angepasst werden.
+
+Template-Dateien:
+
+- `.github/ISSUE_TEMPLATE/create-universal-repository.yml`: Mehrfachauswahl und Workflow-Verweis.
+- `templates/universal/copier.yml`: Copier-Inputs.
+- `templates/universal/project/.github/workflows/ci.yml.jinja`: aufrufender Workflow.
+
 ## Sonar-Konfiguration bei der Repository-Erstellung
 
-In beiden Repository-Formularen gibt es zusätzlich:
+In den Python- und JDK-Formularen gibt es zusätzlich:
 
 | Feld | Wirkung |
 | --- | --- |

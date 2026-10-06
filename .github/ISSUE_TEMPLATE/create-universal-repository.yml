@@ -1,0 +1,49 @@
+name: Universelles Repository mit Reusable Workflow erstellen
+description: Nur einen aufrufenden Workflow erzeugen und einen oder mehrere Typen übergeben.
+title: "[repo] Universelles Projekt"
+body:
+  - type: dropdown
+    id: action
+    attributes:
+      label: Aktion
+      options: [preview, create]
+    validations:
+      required: true
+  - type: input
+    id: repository_name
+    attributes:
+      label: Repository-Name
+      placeholder: demo-universal-service
+    validations:
+      required: true
+  - type: dropdown
+    id: visibility
+    attributes:
+      label: Sichtbarkeit
+      options: [private, public]
+    validations:
+      required: true
+  - type: dropdown
+    id: template
+    attributes:
+      label: Vorlage
+      options: [universal]
+    validations:
+      required: true
+  - type: dropdown
+    id: types
+    attributes:
+      label: Typen
+      description: Einen oder mehrere Typen auswählen. Sie werden als JSON-Array im Input types übergeben.
+      multiple: true
+      options: [node, docker, spring-boot, spring-boot-buildpack]
+    validations:
+      required: true
+  - type: input
+    id: reusable_workflow
+    attributes:
+      label: Reusable Workflow
+      description: Externer Workflow im Format OWNER/REPO/.github/workflows/DATEI.yml@REF. Er muss workflow_call mit String-Input types unterstützen und für das neue Repository zugänglich sein.
+      placeholder: sraisl/reusable-workflows/.github/workflows/ci.yml@main
+    validations:
+      required: true

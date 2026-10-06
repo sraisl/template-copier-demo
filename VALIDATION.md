@@ -18,3 +18,10 @@
 - Factory- und gerenderte JDK-Workflows mit actionlint geprüft.
 - Die Factory-CI baut das generierte Maven-Projekt mit Java 17/21/25 und prüft
   die PolyScan-Integration mit Java 21. PolyScan ist auf v16.1.1 per Commit festgelegt.
+
+## Universelles Template
+
+- Alle 15 nicht leeren Kombinationen der vier Typen werden gerendert und geprüft.
+- Im Ziel entsteht ausschließlich der Caller-Workflow; types ist ein JSON-String.
+- Leere, doppelte und unbekannte Typen sowie ungültige Workflow-Verweise werden abgelehnt.
+- Der externe Reusable Workflow wird nicht erstellt oder ausgeführt.

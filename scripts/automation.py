@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE_FIELDS = {"Aktion", "Repository-Name", "Sichtbarkeit", "CI aktivieren"}
-FIELDS = BASE_FIELDS | {"Python-Version", "Vorlage", "Java-Version", "SAST aktivieren", "Sonar konfigurieren", "SONAR_HOST_URL"}
+FIELDS = BASE_FIELDS | {"Python-Version", "Vorlage", "Java-Version", "SAST aktivieren", "Sonar konfigurieren", "SONAR_HOST_URL", "Typen", "Reusable Workflow"}
 
 def parse_issue(body):
     parts = re.split(r"^### (.+)\s*$", body, flags=re.MULTILINE)
@@ -20,6 +20,8 @@ def parse_issue(body):
         if label in fields or label not in FIELDS:
             raise ValueError("Unbekanntes oder doppeltes Feld: " + label)
         fields[label] = value.strip()
+    if fields.get("Vorlage") == "universal":
+        fields.setdefault("CI aktivieren", "yes")
     if not BASE_FIELDS <= set(fields):
         raise ValueError("Bitte das Repository-Issue-Formular vollständig ausfüllen.")
     name = fields["Repository-Name"]
@@ -27,23 +29,31 @@ def parse_issue(body):
         raise ValueError("Repository-Name: 1–63 Zeichen, Kleinbuchstaben, Zahlen und Bindestriche.")
     fields.setdefault("Vorlage", "python")
     fields.setdefault("SAST aktivieren", "no")
-    required_version = "Java-Version" if fields["Vorlage"] == "jdk" else "Python-Version"
-    if required_version not in fields:
+    required_version = {"jdk": "Java-Version", "python": "Python-Version"}.get(fields["Vorlage"])
+    if required_version and required_version not in fields:
         raise ValueError("Versionsauswahl fehlt: " + required_version)
     # Older creation issues remain valid, without Sonar configuration.
     fields.setdefault("Sonar konfigurieren", "no")
     fields.setdefault("SONAR_HOST_URL", "")
     for field, choices in {
         "Aktion": {"preview", "create"}, "Sichtbarkeit": {"public", "private"},
-        "Vorlage": {"python", "jdk"}, "CI aktivieren": {"yes", "no"},
+        "Vorlage": {"python", "jdk", "universal"}, "CI aktivieren": {"yes", "no"},
         "SAST aktivieren": {"yes", "no"},
         "Sonar konfigurieren": {"yes", "no"},
     }.items():
         if fields[field] not in choices:
             raise ValueError("Ungültige Auswahl: " + field)
     versions = {"Java-Version": {"17", "21", "25"}, "Python-Version": {"3.11", "3.12", "3.13"}}
-    if fields[required_version] not in versions[required_version]:
+    if required_version and fields[required_version] not in versions[required_version]:
         raise ValueError("Ungültige Auswahl: " + required_version)
+    if fields["Vorlage"] == "universal":
+        if fields["CI aktivieren"] != "yes":
+            raise ValueError("Das universelle Template erstellt immer den aufrufenden Workflow.")
+        fields["Typen"] = parse_types(fields.get("Typen", ""))
+        reference = fields.get("Reusable Workflow", "")
+        pattern = r"[A-Za-z0-9][A-Za-z0-9-]*/[A-Za-z0-9_.-]+/\.github/workflows/[A-Za-z0-9_-][A-Za-z0-9_.-]*\.ya?ml@[A-Za-z0-9][A-Za-z0-9_./-]*"
+        if not re.fullmatch(pattern, reference) or ".." in reference:
+            raise ValueError("Reusable Workflow: OWNER/REPO/.github/workflows/DATEI.yml@REF angeben.")
     if fields["SAST aktivieren"] == "yes" and (fields["Vorlage"] != "jdk" or fields["CI aktivieren"] != "yes"):
         raise ValueError("SAST erfordert das JDK-Template und aktivierte CI.")
     if fields["SONAR_HOST_URL"] == "_No response_":
@@ -62,12 +72,28 @@ def parse_issue(body):
     return fields
 
 
+def parse_types(value):
+    allowed = {"node", "docker", "spring-boot", "spring-boot-buildpack"}
+    if isinstance(value, str):
+        try:
+            selected = json.loads(value) if value.lstrip().startswith("[") else [item.strip() for item in value.split(",")]
+        except json.JSONDecodeError as exc:
+            raise ValueError("Typen müssen eine Auswahl oder ein gültiges JSON-Array sein.") from exc
+    else:
+        selected = value
+    if (not isinstance(selected, list) or not selected
+            or any(not isinstance(item, str) or item not in allowed for item in selected)
+            or len(set(selected)) != len(selected)):
+        raise ValueError("Mindestens einen erlaubten Typ auswählen; keine unbekannten oder doppelten Typen.")
+    return selected
+
+
 def render(fields, destination):
     if Path(destination).exists():
         raise ValueError("Ausgabeverzeichnis existiert bereits.")
     from copier import run_copy
     template = fields.get("Vorlage", "python")
-    if template not in {"python", "jdk"}:
+    if template not in {"python", "jdk", "universal"}:
         raise ValueError("Unbekannte Vorlage.")
     data = {
         "repository_name": fields["Repository-Name"],
@@ -75,6 +101,9 @@ def render(fields, destination):
     }
     if template == "jdk":
         data.update(java_version=fields["Java-Version"], include_sast=fields.get("SAST aktivieren") == "yes")
+    elif template == "universal":
+        data.update(types_json=json.dumps(parse_types(fields["Typen"]), separators=(",", ":")),
+                    reusable_workflow=fields["Reusable Workflow"])
     else:
         data["python_version"] = fields["Python-Version"]
     run_copy(str(ROOT / "templates" / template), destination, defaults=True, data=data)
