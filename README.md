@@ -57,8 +57,7 @@ Für `create` unter **Settings → Secrets and variables → Actions** konfiguri
 Für eine einfache Demo im persönlichen Account eignet sich ein **classic PAT**
 mit `repo` und zusätzlich `workflow`, wenn CI generiert wird. Das Token muss zum
 Zielkonto gehören. Für eine Organisation muss das Konto Repositories erstellen
-dürfen; gegebenenfalls ist eine SSO-Autorisierung erforderlich. Das Secret wird
-nur für die Erstellung und den Push verwendet. Der normale `GITHUB_TOKEN`
+dürfen; gegebenenfalls ist eine SSO-Autorisierung erforderlich. Das Token wird für Erstellung, Push und die Konfiguration von Ziel-Repositories verwendet. Der normale `GITHUB_TOKEN`
 verarbeitet Issue-Kommentare und kann keine neuen Repositories außerhalb des
 Workflow-Repositories verwalten.
 
@@ -86,7 +85,7 @@ rendern. Für die Demo ist daher kein zweites Template-Repository nötig.
 
 Fehler werden als Kommentar gemeldet; das Issue bleibt offen. Nach einer
 Korrektur das Issue schließen und erneut öffnen. Änderungen am Issue allein
-lösen keine Aktion aus. Nur Titel mit `[repo]` starten den Workflow.
+lösen keine Aktion aus. Titel mit `[repo]` oder `[config]` starten den Workflow.
 
 Ein vorhandenes Ziel-Repository wird niemals überschrieben. Eine erneute
 `create`-Anfrage mit demselben Namen schlägt fehl. Falls die GitHub-Erstellung
@@ -94,6 +93,59 @@ funktioniert, aber der Push scheitert, bleibt das leere Repository bestehen;
 der Fehler nennt dessen URL. Es wird nicht automatisch gelöscht. Für den
 nächsten Versuch einen anderen Namen wählen oder das leere Repository manuell
 bereinigen. Eine neue Vorschau ist jederzeit über ein neues Issue möglich.
+
+## Zusätzliche Demo: Variablen und Secrets
+
+Unter **Issues → New issue** stehen zwei weitere Formulare zur Verfügung:
+
+| Formular | Aktion | Verhalten |
+| --- | --- | --- |
+| Repository-Variable setzen | `set-variable` | Erstellt oder aktualisiert beispielsweise `APP_ENV=demo` |
+| Repository-Secret generieren | `generate-secret` | Erzeugt beispielsweise `DEMO_TOKEN` aus 32 kryptografisch zufälligen Bytes |
+
+Der Repository-Name bezieht sich immer auf `TARGET_OWNER` (standardmäßig den
+Besitzer der Factory). Die auslösende Person benötigt aktuelle Schreibrechte
+sowohl in der Factory als auch im Ziel. Die Factory selbst ist als Ziel gesperrt.
+Das Ziel kann auch ein bereits bestehendes Repository sein.
+
+`REPO_FACTORY_TOKEN` muss im Ziel die Konfiguration verwalten dürfen. Bei einem
+Fine-grained PAT oder einer GitHub App sind dafür **Variables: write** und
+**Secrets: write** erforderlich; der Token muss auf das Ziel zugreifen können.
+Die bestehende Classic-PAT-Demo benötigt für diese Repository-Aktionen `repo`.
+
+Variablen sind öffentlich innerhalb des Issue-Inhalts: hier nur nicht vertrauliche
+Werte eintragen. Namen müssen aus Großbuchstaben, Zahlen und Unterstrichen bestehen,
+dürfen nicht mit einer Zahl oder `GITHUB_` beginnen und maximal 64 Zeichen lang
+sein. Variablenwerte sind auf eine Zeile mit maximal 256 Zeichen beschränkt.
+
+Secret-Werte werden im Workflow generiert und über stdin an `gh secret set`
+übergeben. Sie erscheinen weder im Issue, in CLI-Argumenten noch in Erfolgsmeldungen.
+Ein vorhandenes Secret wird vor dem Schreiben erkannt und die Anfrage abgelehnt;
+eine absichtliche Rotation ist nicht Bestandteil dieser Demo. Ein zufälliges
+Demo-Secret ist kein von einem externen Dienst ausgestelltes API-Token.
+
+### Ablauf für eine Präsentation
+
+1. Projekt mit `create` und aktivierter CI erstellen.
+2. Issue **Repository-Variable setzen** öffnen: Repository auswählen,
+   `APP_ENV` als Name und `demo` als Wert eintragen.
+3. Issue **Repository-Secret generieren** öffnen: dasselbe Repository und
+   `DEMO_TOKEN` auswählen.
+4. Im Ziel unter **Settings → Secrets and variables → Actions** die Einträge zeigen.
+5. Unter **Actions → Demo-Konfiguration prüfen → Run workflow** die Prüfung starten.
+   Sie zeigt die Variable und bestätigt lediglich, ob das Secret vorhanden ist.
+6. Ein weiteres Variablen-Issue mit `APP_ENV=staging` demonstriert eine Aktualisierung.
+
+Neue Projekte mit aktivierter CI enthalten `.github/workflows/check-config.yml`.
+Bei bereits erzeugten Projekten die Datei aus
+`templates/python/project/{% if include_ci %}.github{% endif %}/workflows/check-config.yml`
+ins Ziel-Repository nach `.github/workflows/check-config.yml` kopieren und committen.
+Die Prüfnamen sind im manuellen Workflow anpassbar. Fehlende Variable oder fehlendes
+Secret führt zu einer fehlgeschlagenen Prüfung.
+
+Beispiel-Issue-Inhalte: `examples/set-variable.md` und `examples/generate-secret.md`.
+`--body` dient ausschließlich der lokalen Projektvorschau und lehnt diese
+Konfigurationsaktionen ab.
 
 ## Weitere Aktionen ergänzen
 
@@ -116,4 +168,6 @@ GitHub-Erstellung und Push werden lokal nicht ausgeführt. Der echte End-to-End-
 benötigt ein hochgeladenes Demo-Repository und das konfigurierte Secret.
 
 Quellen: [Copier API](https://copier.readthedocs.io/en/stable/reference/api/),
-[GitHub-Token und dessen Repository-Grenzen](https://docs.github.com/en/actions/concepts/security/github_token).
+[GitHub-Token und dessen Repository-Grenzen](https://docs.github.com/en/actions/concepts/security/github_token),
+[Secrets-API](https://docs.github.com/en/rest/actions/secrets),
+[Variablen-API](https://docs.github.com/en/rest/actions/variables).

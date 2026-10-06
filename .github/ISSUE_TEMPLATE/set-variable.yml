@@ -1,0 +1,34 @@
+name: Repository-Variable setzen
+description: Actions-Variable in einem bestehenden Ziel-Repository erstellen oder aktualisieren.
+title: "[config] Variable setzen"
+body:
+  - type: dropdown
+    id: action
+    attributes:
+      label: Aktion
+      options: [set-variable]
+    validations:
+      required: true
+  - type: input
+    id: repository
+    attributes:
+      label: Repository-Name
+      description: Repository beim konfigurierten TARGET_OWNER. Schreibrechte im Ziel sind erforderlich.
+      placeholder: demo-service
+    validations:
+      required: true
+  - type: input
+    id: name
+    attributes:
+      label: Variablenname
+      placeholder: APP_ENV
+    validations:
+      required: true
+  - type: input
+    id: value
+    attributes:
+      label: Wert
+      description: Nur nicht vertrauliche Werte; der Issue-Inhalt ist sichtbar.
+      placeholder: demo
+    validations:
+      required: true

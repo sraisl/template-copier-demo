@@ -1,11 +1,11 @@
-# Lokale Prüfung
+# Validierung der Erweiterung
 
-- Fünf Tests für Eingabevalidierung, Berechtigungen, bestehende Ziel-Repositories und Token-Zielkonto erfolgreich.
-- GitHub-Actions-Workflows mit `actionlint` geprüft.
-- YAML-Dateien und Jinja-Renderings der Python-/Workflow-Dateien geprüft.
-- Vollständiger Copier-Integrationstest vorhanden, aber hier nicht ausführbar:
-  PyPI ist aus dieser Umgebung nicht erreichbar; Copier konnte nicht installiert werden.
-- GitHub-End-to-End-Test und Veröffentlichung offen: Die vorhandene CLI-Anmeldung
-  ist ungültig. Außerdem ist das Anlegen von `.git` in dieser Arbeitsmappe durch
-  die Dateisystemrichtlinie gesperrt. Projektdateien sind vollständig angelegt;
-  die Initialisierungs- und Upload-Befehle stehen in der README.
+- 12 lokale Tests für Formularvalidierung, Dispatcher, Berechtigungen,
+  Variablenkonfiguration, Secret-Erzeugung, bestehende Secrets und vertrauliche
+  Fehlermeldungen erfolgreich. GitHub-Aufrufe sind dabei gemockt.
+- Bestehende Workflows und neuer Konfigurations-Prüfworkflow mit `actionlint` geprüft.
+- Der ursprüngliche Repository-Erstellungsablauf wurde vom Benutzer auf GitHub
+  erfolgreich getestet.
+- Der vollständige Copier-Integrationstest und die neuen GitHub-End-to-End-Aktionen
+  konnten lokal nicht ausgeführt werden: PyPI ist aus der Sandbox nicht erreichbar.
+  Die Tests bleiben im GitHub-Actions-Testworkflow enthalten.

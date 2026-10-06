@@ -1,0 +1,37 @@
+name: Demo-Konfiguration prüfen
+on:
+  workflow_dispatch:
+    inputs:
+      variable_name:
+        description: Zu prüfende Actions-Variable
+        default: APP_ENV
+        required: true
+        type: string
+      secret_name:
+        description: Zu prüfendes Actions-Secret
+        default: DEMO_TOKEN
+        required: true
+        type: string
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Variable anzeigen und Secret prüfen
+        env:
+          VARIABLE_NAME: ${{ inputs.variable_name }}
+          VARIABLE_VALUE: ${{ vars[inputs.variable_name] }}
+          SECRET_NAME: ${{ inputs.secret_name }}
+          SECRET_VALUE: ${{ secrets[inputs.secret_name] }}
+        run: |
+          python3 - <<'PY'
+          import os
+          import sys
+          value = os.environ['VARIABLE_VALUE']
+          present = bool(os.environ['SECRET_VALUE'])
+          print(f"Variable {os.environ['VARIABLE_NAME']!r}: {value!r}")
+          print(f"Secret {os.environ['SECRET_NAME']!r} vorhanden: {'ja' if present else 'nein'}")
+          if not value or not present:
+              sys.exit('Demo-Konfiguration unvollständig.')
+          PY

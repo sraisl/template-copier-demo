@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   execute:
-    if: startsWith(github.event.issue.title, '[repo]')
+    if: startsWith(github.event.issue.title, '[repo]') || startsWith(github.event.issue.title, '[config]')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
