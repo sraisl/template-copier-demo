@@ -15,6 +15,8 @@ flowchart LR
     F --> G
 ```
 
+Die kompakte Erklärung zur Template-Struktur und zum Ablauf steht in [TEMPLATES.md](TEMPLATES.md).
+
 ## Demo lokal ausprobieren
 
 Voraussetzungen: Python ab 3.11 und [uv](https://docs.astral.sh/uv/).
