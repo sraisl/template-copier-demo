@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 BASE_FIELDS = {"Aktion", "Repository-Name", "Sichtbarkeit", "CI aktivieren"}
-FIELDS = BASE_FIELDS | {"Python-Version", "Vorlage", "Java-Version", "SAST aktivieren", "Sonar konfigurieren", "SONAR_HOST_URL", "Typen", "Reusable Workflow"}
+FIELDS = BASE_FIELDS | {"Python-Version", "Vorlage", "Java-Version", "SAST aktivieren", "Sonar konfigurieren", "SONAR_HOST_URL", "Typen", "Reusable Workflow", "JDK_HOME"}
 
 def parse_issue(body):
     parts = re.split(r"^### (.+)\s*$", body, flags=re.MULTILINE)
@@ -47,6 +47,9 @@ def parse_issue(body):
     if required_version and fields[required_version] not in versions[required_version]:
         raise ValueError("Ungültige Auswahl: " + required_version)
     if fields["Vorlage"] == "universal":
+        fields.setdefault("JDK_HOME", "/opt/jdk-21")
+        if fields["JDK_HOME"] not in {"/opt/jdk-21", "/opt/jdk-25", "/opt/jdk-17"}:
+            raise ValueError("Ungültige Auswahl: JDK_HOME")
         if fields["CI aktivieren"] != "yes":
             raise ValueError("Das universelle Template erstellt immer den aufrufenden Workflow.")
         fields["Typen"] = parse_types(fields.get("Typen", ""))
@@ -135,6 +138,15 @@ def publish(fields, destination, owner, token, sonar_token=""):
         "name": fields["Repository-Name"], "private": fields["Sichtbarkeit"] == "private",
         "description": "Mit GitHub Issues und Copier erstellt", "auto_init": False,
     })
+    if fields.get("Vorlage") == "universal":
+        try:
+            api(f"repos/{repo['full_name']}/actions/variables", token, "POST", {
+                "name": "JDK_HOME", "value": fields["JDK_HOME"],
+            })
+        except RuntimeError as exc:
+            raise RuntimeError("Repository erstellt, JDK_HOME-Konfiguration fehlgeschlagen. "
+                               "Token-Berechtigungen prüfen und Repository manuell prüfen: "
+                               + repo["html_url"]) from exc
     if fields.get("Sonar konfigurieren") == "yes":
         try:
             initialize_sonar(repo["full_name"], fields["SONAR_HOST_URL"], sonar_token, token)

@@ -48,6 +48,15 @@ body:
     validations:
       required: true
   - type: dropdown
+    id: jdk_home
+    attributes:
+      label: JDK_HOME
+      description: Wird bei create als Actions-Variable im neuen Repository gesetzt.
+      options: ["/opt/jdk-21", "/opt/jdk-25", "/opt/jdk-17"]
+      default: 0
+    validations:
+      required: true
+  - type: dropdown
     id: sonar
     attributes:
       label: Sonar konfigurieren

@@ -45,7 +45,7 @@ class UniversalTemplateTests(unittest.TestCase):
             repo = {'full_name': 'owner/demo-universal-service',
                     'html_url': 'https://github.com/owner/demo-universal-service',
                     'clone_url': 'https://github.com/owner/demo-universal-service.git'}
-            with patch.object(automation, 'api', side_effect=[{'type': 'Organization'}, repo]), patch.object(
+            with patch.object(automation, 'api', side_effect=[{'type': 'Organization'}, repo, None]), patch.object(
                 automation, 'initialize_sonar'
             ) as initialize, patch.object(automation.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)):
                 automation.publish(fields, destination, 'owner', 'fake', 'private-sonar-token')
@@ -57,6 +57,35 @@ class UniversalTemplateTests(unittest.TestCase):
         with patch.object(automation, 'api') as api, self.assertRaises(ValueError):
             automation.publish(fields, Path('unused'), 'owner', 'fake')
         api.assert_not_called()
+
+    def test_jdk_home_selection_is_validated_and_published(self):
+        repo = {'full_name': 'owner/demo-universal-service',
+                'html_url': 'https://github.com/owner/demo-universal-service',
+                'clone_url': 'https://github.com/owner/demo-universal-service.git'}
+        for value in ['/opt/jdk-21', '/opt/jdk-25', '/opt/jdk-17']:
+            with self.subTest(value=value):
+                fields = automation.parse_issue(BODY.replace('/opt/jdk-21', value))
+                with patch.object(automation, 'api', side_effect=[{'type': 'Organization'}, repo, None]) as api, patch.object(
+                    automation.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0)
+                ):
+                    automation.publish(fields, Path('unused'), 'owner', 'fake')
+                self.assertEqual(api.call_args.args, (
+                    'repos/owner/demo-universal-service/actions/variables', 'fake', 'POST',
+                    {'name': 'JDK_HOME', 'value': value}))
+        with self.assertRaises(ValueError):
+            automation.parse_issue(BODY.replace('/opt/jdk-21', '/opt/jdk-99'))
+        legacy = BODY.split('### JDK_HOME')[0]
+        self.assertEqual(automation.parse_issue(legacy)['JDK_HOME'], '/opt/jdk-21')
+
+    def test_jdk_home_configuration_failure_prevents_push(self):
+        fields = automation.parse_issue(BODY)
+        repo = {'full_name': 'owner/demo', 'html_url': 'https://github.com/owner/demo'}
+        with patch.object(automation, 'api', side_effect=[
+            {'type': 'Organization'}, repo, RuntimeError('permission denied')
+        ]), patch.object(automation.subprocess, 'run') as run:
+            with self.assertRaisesRegex(RuntimeError, 'JDK_HOME-Konfiguration fehlgeschlagen'):
+                automation.publish(fields, Path('unused'), 'owner', 'fake')
+            run.assert_not_called()
 
     def test_json_input_is_supported(self):
         fields = automation.parse_issue(BODY.replace(', '.join(TYPES), '["node", "docker"]'))

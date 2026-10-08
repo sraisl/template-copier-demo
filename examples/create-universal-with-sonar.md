@@ -29,3 +29,7 @@ yes
 ### SONAR_HOST_URL
 
 https://sonarqube.example.com
+
+### JDK_HOME
+
+/opt/jdk-21

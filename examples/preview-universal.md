@@ -21,3 +21,7 @@ node, docker, spring-boot, spring-boot-buildpack
 ### Reusable Workflow
 
 sraisl/reusable-workflows/.github/workflows/ci.yml@main
+
+### JDK_HOME
+
+/opt/jdk-21

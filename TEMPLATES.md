@@ -42,6 +42,12 @@ ist `sraisl/reusable-workflows/.github/workflows/ci.yml@main`.
 Python und JDK erzeugen `.copier-answers.yml` mit den Template-Antworten.
 Universal erzeugt diese Datei nicht, damit ausschließlich der Caller im Ziel liegt.
 
+Bei Universal wählt das Formular `JDK_HOME` aus `/opt/jdk-21`, `/opt/jdk-25`
+und `/opt/jdk-17`. Bei `create` wird die Auswahl vor dem ersten Push als
+Actions-Variable im neuen Repository gesetzt und kann über `vars.JDK_HOME`
+verwendet werden. Ältere Issues ohne dieses Feld verwenden `/opt/jdk-21`.
+Bei `preview` werden keine Repository-Variablen gesetzt.
+
 ## Sonar und Secrets
 
 Bei aktivierter Sonar-Option setzt die Automation ausschließlich im **neuen** Repository
